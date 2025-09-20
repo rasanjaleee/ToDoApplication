@@ -35,25 +35,15 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Install dependencies for Chrome
+      - name: Install dependencies for Selenium
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
+          sudo apt-get install -y xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
 
-      - name: Install Google Chrome
-        run: |
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -f -y
-
-      - name: Install matching ChromeDriver
-        run: |
-          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
-          echo "Detected Chrome version: $CHROME_VERSION"
-          DRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION)
-          wget https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip
-          unzip chromedriver_linux64.zip
-          sudo mv chromedriver /usr/local/bin/
-          sudo chmod +x /usr/local/bin/
+      - name: Set up ChromeDriver
+        uses: nanasess/setup-chromedriver@v1
+        with:
+          chromedriver-version: latest
 
       - name: Build project
         run: mvn clean package -DskipTests
@@ -61,6 +51,7 @@ jobs:
       - name: Start Spring Boot server
         run: |
           mvn spring-boot:run &
+          # Wait for backend to start
           sleep 30
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
