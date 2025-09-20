@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: self-hosted   # 👈 runs on your own Windows PC
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
@@ -21,13 +21,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # No MySQL installation here, because you already have MySQL Workbench locally.
-      # Just make sure your MySQL service is running and the "taskmanager_test" DB exists.
+      # No need to install MySQL or Chrome; Windows runner already has Chrome
+      # and you are connecting to your own MySQL Workbench DB.
 
       - name: Build & run tests
         run: mvn clean test
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_URL: jdbc:mysql://172.27.240.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: Rasa@123
           SPRING_PROFILES_ACTIVE: test
@@ -49,7 +49,7 @@ jobs:
           path: target/*.jar
 
   deploy:
-    runs-on: self-hosted
+    runs-on: windows-latest
     needs: build-and-test
     if: github.ref == 'refs/heads/main'
 
@@ -61,4 +61,4 @@ jobs:
 
       - name: Deploy to server (Placeholder)
         run: |
-          echo "Here I would deploy my Spring Boot JAR to a server"
+          echo "Deployment step placeholder - add real deployment commands here"
