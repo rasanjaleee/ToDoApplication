@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     services:
       mysql:
@@ -16,9 +16,10 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: Rasa@123
           MYSQL_DATABASE: taskmanager_test
-          MYSQL_TCP_PORT: 3306
+        ports:
+          - 33306:3306
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="mysqladmin ping -h localhost -u root -pRasa@123"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
@@ -34,63 +35,42 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Set ChromeDriver Path
+      - name: Install Chrome & Chromedriver
         run: |
-          echo "C:\Program Files\Google\Chrome\Application\chromedriver.exe" > chromedriver-path.txt
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
 
       - name: Wait for MySQL to be ready
         run: |
-          for /L %%i in (1,1,30) do (
-            mysql -h 127.0.0.1 -P 3306 -u root -pRasa@123 -e "SELECT 1" >nul 2>&1
-            if not errorlevel 1 (
-              echo MySQL is ready!
-              exit /b 0
-            )
-            echo Waiting for MySQL... Attempt %%i
-            timeout /t 2 >nul
-          )
+          for i in {1..30}; do
+            if mysql -h 127.0.0.1 -P 33306 -u root -pRasa@123 -e "SELECT 1" >/dev/null 2>&1; then
+              echo "MySQL ready"
+              break
+            fi
+            echo "Waiting for MySQL... Attempt $i"
+            sleep 2
+          done
 
       - name: Create test database
         run: |
-          mysql -h 127.0.0.1 -P 3306 -u root -pRasa@123 -e "CREATE DATABASE IF NOT EXISTS taskmanager_test;"
+          mysql -h 127.0.0.1 -P 33306 -u root -pRasa@123 -e "CREATE DATABASE IF NOT EXISTS taskmanager_test;"
 
-      - name: Build and run tests
-        run: mvn clean compile test
+      - name: Build & run tests
+        run: mvn clean test
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:33306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: Rasa@123
           SPRING_PROFILES_ACTIVE: test
           CI: true
 
-      - name: Upload test results
-        if: always()
+      - name: Upload test reports
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: target/surefire-reports/
 
-      - name: Build JAR package
+      - name: Build JAR
         run: mvn package -DskipTests
 
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-jar
-          path: target/*.jar
-
-  deploy:
-    runs-on: windows-latest
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Download JAR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: application-jar
-
-      - name: Deploy to server (Example)
-        run: |
-          echo "Deploying application..."
-          # Add your deployment commands here
+      - name: Upload JAR art
