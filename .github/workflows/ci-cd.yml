@@ -8,21 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: Rasa@123
-          MYSQL_DATABASE: taskmanager_test
-        ports:
-          - 33306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -pRasa@123"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
+    runs-on: self-hosted   # 👈 runs on your own Windows PC
 
     steps:
       - name: Checkout code
@@ -35,30 +21,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Install Chrome & Chromedriver
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
-
-      - name: Wait for MySQL to be ready
-        run: |
-          for i in {1..30}; do
-            if mysql -h 127.0.0.1 -P 33306 -u root -pRasa@123 -e "SELECT 1" >/dev/null 2>&1; then
-              echo "MySQL ready"
-              break
-            fi
-            echo "Waiting for MySQL... Attempt $i"
-            sleep 2
-          done
-
-      - name: Create test database
-        run: |
-          mysql -h 127.0.0.1 -P 33306 -u root -pRasa@123 -e "CREATE DATABASE IF NOT EXISTS taskmanager_test;"
+      # No MySQL installation here, because you already have MySQL Workbench locally.
+      # Just make sure your MySQL service is running and the "taskmanager_test" DB exists.
 
       - name: Build & run tests
         run: mvn clean test
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:33306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: Rasa@123
           SPRING_PROFILES_ACTIVE: test
@@ -80,7 +49,7 @@ jobs:
           path: target/*.jar
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: build-and-test
     if: github.ref == 'refs/heads/main'
 
@@ -92,4 +61,4 @@ jobs:
 
       - name: Deploy to server (Placeholder)
         run: |
-          echo "Deployment step placeholder - add real deployment commands here"
+          echo "Here I would deploy my Spring Boot JAR to a server"
