@@ -21,8 +21,10 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # No need to install MySQL or Chrome; Windows runner already has Chrome
-      # and you are connecting to your own MySQL Workbench DB.
+      - name: Set up ChromeDriver
+        uses: nanasess/setup-chromedriver@v1
+        with:
+          chromedriver-version: latest
 
       - name: Build & run tests
         run: mvn clean test
