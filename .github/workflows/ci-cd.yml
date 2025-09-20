@@ -10,6 +10,20 @@ jobs:
   build-and-test:
     runs-on: windows-latest
 
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: Rasa@123
+          MYSQL_DATABASE: taskmanager_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -26,10 +40,24 @@ jobs:
         with:
           chromedriver-version: latest
 
-      - name: Build & run tests
-        run: mvn clean test
+      - name: Build project
+        run: mvn clean package -DskipTests
+
+      - name: Start Spring Boot server
+        run: |
+          mvn spring-boot:run &
+          # wait for backend to start
+          sleep 30
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://172.27.240.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: Rasa@123
+          SPRING_PROFILES_ACTIVE: test
+
+      - name: Run tests
+        run: mvn test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: Rasa@123
           SPRING_PROFILES_ACTIVE: test
