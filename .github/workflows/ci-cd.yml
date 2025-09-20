@@ -35,15 +35,20 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Install Chrome
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: latest
+      - name: Install Google Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip xvfb libxi6 libgconf-2-4
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt install -y ./google-chrome-stable_current_amd64.deb
 
-      - name: Install ChromeDriver
+      - name: Install matching ChromeDriver
         run: |
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
-          wget https://chromedriver.storage.googleapis.com/${CHROME_VERSION}/chromedriver_linux64.zip
+          echo "Detected Chrome version: $CHROME_VERSION"
+          DRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION)
+          echo "Installing ChromeDriver version: $DRIVER_VERSION"
+          wget https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip
           unzip chromedriver_linux64.zip
           sudo mv chromedriver /usr/local/bin/
           sudo chmod +x /usr/local/bin/
@@ -54,7 +59,6 @@ jobs:
       - name: Start Spring Boot server
         run: |
           mvn spring-boot:run &
-          # wait for backend to start
           sleep 30
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
