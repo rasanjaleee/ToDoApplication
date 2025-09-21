@@ -25,53 +25,58 @@ jobs:
           --health-retries=5
 
     steps:
-      # 1️⃣ Checkout repository
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ Set up JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: 17
           cache: maven
 
-      # 3️⃣ Install dependencies for Chrome
-      - name: Install dependencies for Chrome
+      - name: Install dependencies for Selenium
         run: |
           sudo apt-get update
           sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
 
-      # 4️⃣ Install Google Chrome
       - name: Install Google Chrome
         run: |
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -f -y
+          google-chrome --version
 
-      # 5️⃣ Install ChromeDriver matching Chrome version
-      - name: Install ChromeDriver
-        uses: seleniumhq/setup-chromedriver@v1
-        with:
-          version: latest
+      - name: Install matching ChromeDriver
+        run: |
+          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
+          echo "Detected Chrome version: $CHROME_VERSION"
+          DRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION)
+          echo "Using ChromeDriver version: $DRIVER_VERSION"
+          wget https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip
+          unzip chromedriver_linux64.zip
+          sudo mv chromedriver /usr/local/bin/
+          sudo chmod +x /usr/local/bin/
+          chromedriver --version
 
-      # 6️⃣ Build project (skip tests here)
       - name: Build project
         run: mvn clean package -DskipTests
 
-      # 7️⃣ Start Spring Boot server in background
       - name: Start Spring Boot server
         run: |
           mvn spring-boot:run &
-          sleep 30
+          # Wait until backend is ready
+          for i in {1..12}; do
+            curl -s http://localhost:8080/actuator/health && break
+            echo "Waiting for Spring Boot..."
+            sleep 5
+          done
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: Rasa@123
           SPRING_PROFILES_ACTIVE: test
 
-      # 8️⃣ Run Unit & Selenium tests (headless Chrome)
-      - name: Run tests
+      - name: Run Selenium & Unit Tests
         run: mvn test
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -80,18 +85,15 @@ jobs:
           SPRING_PROFILES_ACTIVE: test
           CI: true
 
-      # 9️⃣ Upload test reports
       - name: Upload test reports
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: target/surefire-reports/
 
-      # 🔟 Build JAR
       - name: Build JAR
         run: mvn package -DskipTests
 
-      # 1️⃣1️⃣ Upload JAR artifact
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
