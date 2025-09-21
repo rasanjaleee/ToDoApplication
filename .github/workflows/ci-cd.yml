@@ -40,10 +40,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
 
-      - name: Set up ChromeDriver
-        uses: nanasess/setup-chromedriver@v1
-        with:
-          chromedriver-version: latest
+      # ✅ FIX: use maintained browser-actions
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@latest
+
+      - name: Install ChromeDriver
+        uses: browser-actions/setup-chromedriver@latest
 
       - name: Build project
         run: mvn clean package -DskipTests
