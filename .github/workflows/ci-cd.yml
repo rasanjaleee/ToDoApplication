@@ -35,17 +35,12 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Install dependencies for Selenium
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
-
-      # ✅ FIX: use maintained browser-actions
+      # ✅ Install Chrome & ChromeDriver using maintained actions
       - name: Install Chrome
-        uses: browser-actions/setup-chrome@latest
+        uses: browser-actions/setup-chrome@v1
 
       - name: Install ChromeDriver
-        uses: browser-actions/setup-chromedriver@latest
+        uses: browser-actions/setup-chromedriver@v1
 
       - name: Build project
         run: mvn clean package -DskipTests
