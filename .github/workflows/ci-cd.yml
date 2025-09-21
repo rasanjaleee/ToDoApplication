@@ -35,24 +35,27 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # ✅ Install Chrome
       - name: Install Google Chrome
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -f -y
+          sudo apt-get install -y wget unzip curl xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
+          wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -fy
 
-      # ✅ Install ChromeDriver that matches installed Chrome
       - name: Install matching ChromeDriver
         run: |
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
           echo "Detected Chrome version: $CHROME_VERSION"
-          DRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%.*}")
-          echo "Using ChromeDriver version: $DRIVER_VERSION"
-          wget https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip
-          unzip chromedriver_linux64.zip
-          sudo mv chromedriver /usr/local/bin/
+
+          CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d. -f1-3)
+          echo "Detected Chrome major version: $CHROME_MAJOR"
+
+          DRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR")
+          echo "Resolved ChromeDriver version: $DRIVER_VERSION"
+
+          wget -q "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
+          unzip -o chromedriver_linux64.zip
+          sudo mv -f chromedriver /usr/local/bin/
           sudo chmod +x /usr/local/bin/chromedriver
 
       - name: Build project
@@ -69,7 +72,7 @@ jobs:
           SPRING_PROFILES_ACTIVE: test
 
       - name: Run Selenium & Unit Tests
-        run: xvfb-run mvn test   # ✅ Run headless with Xvfb
+        run: mvn test
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
           SPRING_DATASOURCE_USERNAME: root
