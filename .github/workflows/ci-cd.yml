@@ -24,162 +24,70 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
-    env:
-      # Default DB connection used by Spring in CI; tests can override if needed
-      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: Rasa@123
-      SPRING_PROFILES_ACTIVE: test
-      CI: "true"
-
     steps:
-      - name: Checkout code
+      # Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Set up JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-          cache: maven
 
-      - name: Install OS packages (wget, curl, unzip, node prerequisites)
+      # Build Maven project without running tests
+      - name: Build project
+        run: mvn clean package -DskipTests
+
+      # Start Spring Boot server in background
+      - name: Start Spring Boot server
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends wget curl unzip ca-certificates gnupg lsb-release \
-            xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation libasound2 libatk1.0-0 libatk-bridge2.0-0 \
-            libgtk-3-0
-
-      - name: Install Node.js (for frontend build if present)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Install Google Chrome
-        run: |
-          # Install stable Chrome from Google's repository (handles deps)
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends google-chrome-stable
-          google-chrome --version
-
-      - name: Install matching ChromeDriver (major-version match)
-        run: |
-          set -euo pipefail
-          CHROME_VER_FULL=$(google-chrome --version | awk '{print $3}')
-          echo "Detected Chrome version: $CHROME_VER_FULL"
-          CHROME_MAJOR=$(echo "$CHROME_VER_FULL" | cut -d. -f1)
-          echo "Chrome major version: $CHROME_MAJOR"
-          # Try to get the latest chromedriver for the major version, fallback to latest if not found
-          DRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}" || true)
-          if [ -z "$DRIVER_VERSION" ]; then
-            echo "No LATEST_RELEASE for major $CHROME_MAJOR — falling back to global LATEST_RELEASE"
-            DRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
-          fi
-          echo "Resolved ChromeDriver version: $DRIVER_VERSION"
-          wget -q "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
-          unzip -q chromedriver_linux64.zip
-          sudo mv chromedriver /usr/local/bin/chromedriver
-          sudo chmod +x /usr/local/bin/chromedriver
-          /usr/local/bin/chromedriver --version
-
-      - name: Build backend (skip tests)
-        run: mvn -B -V -DskipTests clean package
-
-      - name: (Optional) Build & serve frontend on :5173 if package.json exists
-        run: |
-          # If frontend is in /frontend or root package.json exists, build and serve on 5173 so Selenium can hit it.
-          if [ -f frontend/package.json ]; then
-            echo "Building frontend in ./frontend..."
-            cd frontend
-            npm ci
-            npm run build
-            # serve the static build (http-server is installed temporarily via npx)
-            npx http-server build -p 5173 -a 127.0.0.1 > /tmp/http-server.log 2>&1 &
-            cd ..
-          elif [ -f package.json ]; then
-            echo "Building frontend in repo root..."
-            npm ci
-            npm run build
-            npx http-server build -p 5173 -a 127.0.0.1 > /tmp/http-server.log 2>&1 &
-          else
-            echo "No package.json found; skipping frontend build/serve (ensure your Selenium tests point to the correct URL)"
-          fi
-
-      - name: Start backend (Spring Boot) in background and wait for it
-        run: |
-          # prefer running the packaged jar (faster), fallback to mvn spring-boot:run
-          JAR=$(ls target/*.jar | head -n 1 || true)
-          if [ -n "$JAR" ]; then
-            echo "Starting JAR: $JAR"
-            nohup java -jar "$JAR" --spring.profiles.active=test > /tmp/spring.log 2>&1 &
-          else
-            echo "No packaged jar found, running mvn spring-boot:run"
-            nohup mvn spring-boot:run -Dspring-boot.run.profiles=test > /tmp/spring.log 2>&1 &
-          fi
-
-          # wait for the backend port to respond (loop max ~120s)
-          echo "Waiting for backend to respond on http://127.0.0.1:8080/ (timeout 120s)..."
-          n=0
-          until curl -sSf http://127.0.0.1:8080/ >/dev/null 2>&1 || [ $n -ge 24 ]; do
-            n=$((n+1))
-            sleep 5
-            echo "waited $((n*5))s..."
-          done
-          if [ $n -ge 24 ]; then
-            echo "Backend did not start in time; printing last logs for debugging:"
-            tail -n +1 /tmp/spring.log || true
-            exit 1
-          fi
-          echo "Backend is up. Continuing..."
-
-      - name: Wait for frontend (if served) to be ready (port 5173)
-        run: |
-          if lsof -i :5173 >/dev/null 2>&1; then
-            echo "Frontend server detected on :5173 — waiting for /login to be available (timeout 60s)..."
-            n=0
-            until curl -sSf http://127.0.0.1:5173/login >/dev/null 2>&1 || [ $n -ge 12 ]; do
-              n=$((n+1))
-              sleep 5
-              echo "waited $((n*5))s..."
-            done
-            if [ $n -ge 12 ]; then
-              echo "Frontend did not respond in time; check /tmp/http-server.log"
-              tail -n 200 /tmp/http-server.log || true
-              # not fatal necessarily, continue to run tests (they may fail if UI unavailable)
-            else
-              echo "Frontend ready."
-            fi
-          else
-            echo "No frontend server on :5173 — assuming tests will target backend or static hosting inside backend."
-          fi
-
-      - name: Run unit + Selenium tests
-        run: mvn -B test
+          mvn spring-boot:run &
+          sleep 30
         env:
-          SPRING_DATASOURCE_URL: ${{ env.SPRING_DATASOURCE_URL }}
-          SPRING_DATASOURCE_USERNAME: ${{ env.SPRING_DATASOURCE_USERNAME }}
-          SPRING_DATASOURCE_PASSWORD: ${{ env.SPRING_DATASOURCE_PASSWORD }}
-          SPRING_PROFILES_ACTIVE: ${{ env.SPRING_PROFILES_ACTIVE }}
-          CI: "true"
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: Rasa@123
+          SPRING_PROFILES_ACTIVE: test
 
+      # Install Selenium dependencies
+      - name: Install Selenium dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation wget unzip
+
+      # Use pre-installed Chrome on Ubuntu
+      - name: Set up ChromeDriver
+        run: |
+          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+.\d+.\d+')
+          echo "Detected Chrome version: $CHROME_VERSION"
+          DRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION || curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
+          wget https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip
+          unzip chromedriver_linux64.zip
+          sudo mv chromedriver /usr/local/bin/
+          sudo chmod +x /usr/local/bin/
+
+      # Run all tests: unit, Selenium, API
+      - name: Run all tests
+        run: mvn test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: Rasa@123
+          SPRING_PROFILES_ACTIVE: test
+          CI: true
+
+      # Upload Maven Surefire test reports
       - name: Upload test reports
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: target/surefire-reports/
 
-      - name: Upload spring logs (debug)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: spring-logs
-          path: /tmp/spring.log
+      # Package final JAR artifact
+      - name: Build JAR
+        run: mvn package -DskipTests
 
-      - name: Build JAR (artifacts)
-        run: mvn -B -DskipTests package
-
+      # Upload JAR artifact
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
@@ -190,6 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-test
     if: github.ref == 'refs/heads/main'
+
     steps:
       - name: Download JAR artifact
         uses: actions/download-artifact@v4
