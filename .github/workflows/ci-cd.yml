@@ -1,111 +1,30 @@
-name: CI/CD Pipeline
+name: Selenium Tests
 
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+on: [push, pull_request]
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
 
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: Rasa@123
-          MYSQL_DATABASE: taskmanager_test
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
+          distribution: temurin
+          java-version: 17
 
-      - name: Install Google Chrome
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip curl xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
-          wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -fy
+      # Install Google Chrome
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
 
-      - name: Install matching ChromeDriver
-        run: |
-          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
-          echo "Detected Chrome version: $CHROME_VERSION"
+      # Install matching ChromeDriver
+      - name: Setup ChromeDriver
+        uses: browser-actions/setup-chromedriver@v1
+        with:
+          chrome-version: stable
 
-          CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d. -f1-3)
-          echo "Detected Chrome major version: $CHROME_MAJOR"
-
-          DRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR")
-          echo "Resolved ChromeDriver version: $DRIVER_VERSION"
-
-          wget -q "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
-          unzip -o chromedriver_linux64.zip
-          sudo mv -f chromedriver /usr/local/bin/
-          sudo chmod +x /usr/local/bin/chromedriver
-
-      - name: Build project
-        run: mvn clean package -DskipTests
-
-      - name: Start Spring Boot server
-        run: |
-          mvn spring-boot:run &
-          sleep 30
-        env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-          SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: Rasa@123
-          SPRING_PROFILES_ACTIVE: test
-
-      - name: Run Selenium & Unit Tests
+      - name: Run Selenium tests
         run: mvn test
-        env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-          SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: Rasa@123
-          SPRING_PROFILES_ACTIVE: test
-          CI: true
-
-      - name: Upload test reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: target/surefire-reports/
-
-      - name: Build JAR
-        run: mvn package -DskipTests
-
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-jar
-          path: target/*.jar
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Download JAR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: application-jar
-
-      - name: Deploy to server (Placeholder)
-        run: |
-          echo "Deployment step placeholder - add real deployment commands here"
