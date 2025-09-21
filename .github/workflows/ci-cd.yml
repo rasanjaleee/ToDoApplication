@@ -25,22 +25,41 @@ jobs:
           --health-retries=5
 
     steps:
-      # Checkout code
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # 1️⃣ Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      # Set up JDK 17
+      # 2️⃣ Set up JDK 17
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
-          distribution: temurin
-          java-version: 17
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
 
-      # Build Maven project without running tests
+      # 3️⃣ Install dependencies for Chrome
+      - name: Install dependencies for Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
+
+      # 4️⃣ Install Google Chrome
+      - name: Install Google Chrome
+        run: |
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -f -y
+
+      # 5️⃣ Install ChromeDriver matching Chrome version
+      - name: Install ChromeDriver
+        uses: seleniumhq/setup-chromedriver@v1
+        with:
+          version: latest
+
+      # 6️⃣ Build project (skip tests here)
       - name: Build project
         run: mvn clean package -DskipTests
 
-      # Start Spring Boot server in background
+      # 7️⃣ Start Spring Boot server in background
       - name: Start Spring Boot server
         run: |
           mvn spring-boot:run &
@@ -51,23 +70,8 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: Rasa@123
           SPRING_PROFILES_ACTIVE: test
 
-      # Install Selenium dependencies
-      - name: Install Selenium dependencies
-        run: sudo apt-get update && sudo apt-get install -y xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation wget unzip
-
-      # Use pre-installed Chrome on Ubuntu
-      - name: Set up ChromeDriver
-        run: |
-          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+.\d+.\d+')
-          echo "Detected Chrome version: $CHROME_VERSION"
-          DRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION || curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
-          wget https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip
-          unzip chromedriver_linux64.zip
-          sudo mv chromedriver /usr/local/bin/
-          sudo chmod +x /usr/local/bin/
-
-      # Run all tests: unit, Selenium, API
-      - name: Run all tests
+      # 8️⃣ Run Unit & Selenium tests (headless Chrome)
+      - name: Run tests
         run: mvn test
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -76,18 +80,18 @@ jobs:
           SPRING_PROFILES_ACTIVE: test
           CI: true
 
-      # Upload Maven Surefire test reports
+      # 9️⃣ Upload test reports
       - name: Upload test reports
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: target/surefire-reports/
 
-      # Package final JAR artifact
+      # 🔟 Build JAR
       - name: Build JAR
         run: mvn package -DskipTests
 
-      # Upload JAR artifact
+      # 1️⃣1️⃣ Upload JAR artifact
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
