@@ -1,4 +1,4 @@
-name: Java CI/CD Pipeline
+name: Java CI/CD Pipeline with Selenium
 
 on:
   push:
@@ -24,6 +24,12 @@ jobs:
           --health-timeout=5s
           --health-retries=3
 
+    env:
+      CI: true
+      SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,26 +47,24 @@ jobs:
       - name: Build application (compile only)
         run: mvn clean compile -DskipTests
 
-      - name: Run Unit Tests
-        run: mvn test -DskipITs=true
-        env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
-          SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
+      - name: Start Spring Boot Backend
+        run: mvn spring-boot:run &
 
-      - name: Run Integration Tests
-        run: mvn verify -DskipUnitTests=true -Dtest=*IT
-        env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
-          SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
+      - name: Wait for backend to start
+        run: sleep 20  # wait 20 seconds for Spring Boot to be ready
 
-      - name: Run All Tests (Final verification)
+      - name: Start Frontend (if applicable)
+        run: |
+          npm install
+          npm run build
+          npm run serve &
+
+      - name: Wait for frontend to start
+        run: sleep 10  # wait 10 seconds for frontend to be ready
+
+      - name: Run All Tests (including Selenium UI)
         run: mvn test
-        env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
-          SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
+        shell: bash
 
       - name: Generate Test Report
         run: |
