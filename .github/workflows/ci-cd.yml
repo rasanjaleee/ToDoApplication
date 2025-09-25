@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
@@ -60,16 +60,16 @@ jobs:
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
           SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: Edirsinghe2002R
+          SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
 
       - name: Generate Test Report
         run: |
           mvn surefire-report:report site
           echo "=== TEST RESULTS ==="
-          echo "Tests completed successfully!"
+          cat target/surefire-reports/*.txt | grep -E "(Tests run|Failures|Errors)" || echo "No test reports generated"
 
       - name: Upload Test Reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: |
@@ -81,3 +81,4 @@ jobs:
         run: |
           echo "🎉 CI/CD Pipeline Completed Successfully!"
           echo "📊 Test reports are available in the artifacts"
+          echo "✅ All tests passed!"
