@@ -1,4 +1,4 @@
-name: Java CI/CD Pipeline
+name: Java CI/CD Pipeline with Selenium
 
 on:
   push:
@@ -25,6 +25,7 @@ jobs:
           --health-retries=3
 
     env:
+      CI: true
       SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
@@ -43,6 +44,13 @@ jobs:
       - name: Validate Maven configuration
         run: mvn --version
 
+      - name: Install Chrome and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip xvfb libnss3 libgconf-2-4 libxi6 libxss1 libxrandr2 libx11-xcb1 libgtk-3-0 fonts-liberation libasound2
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
+
       - name: Build application (compile only)
         run: mvn clean compile -DskipTests
 
@@ -50,11 +58,12 @@ jobs:
         run: mvn spring-boot:run &
 
       - name: Wait for backend to start
-        run: sleep 20  # wait 20 seconds for Spring Boot to be ready
+        run: |
+          echo "Waiting for Spring Boot backend..."
+          sleep 30  # optionally, increase if backend takes longer
 
-      - name: Run Unit/Integration Tests (Skip Selenium UI)
-        run: mvn test -Dtest='!*UITest*'
-        shell: bash
+      - name: Run All Tests (including Selenium UI)
+        run: xvfb-run -a mvn test
 
       - name: Generate Test Report
         run: |
@@ -75,4 +84,4 @@ jobs:
         run: |
           echo "🎉 CI/CD Pipeline Completed Successfully!"
           echo "📊 Test reports are available in the artifacts"
-          echo "✅ All unit/integration tests passed!"
+          echo "✅ All tests passed!"
