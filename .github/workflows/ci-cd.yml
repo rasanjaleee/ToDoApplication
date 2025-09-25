@@ -1,10 +1,10 @@
-name: Java CI/CD Pipeline with Selenium
+name: CI/CD for Task Manager
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
   build-and-test:
@@ -14,74 +14,39 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: Edirisinghe2002R
           MYSQL_DATABASE: taskmanager
         ports:
           - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
-
-    env:
-      CI: true
-      SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'maven'
 
-      - name: Validate Maven configuration
-        run: mvn --version
-
-      - name: Install Chrome and dependencies
+      - name: Setup MySQL
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip xvfb libnss3 libgconf-2-4 libxi6 libxss1 libxrandr2 libx11-xcb1 libgtk-3-0 fonts-liberation libasound2
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
+          sleep 10
+          mysql -h 127.0.0.1 -u root -pEdirisinghe2002R -e "CREATE DATABASE IF NOT EXISTS taskmanager;"
 
-      - name: Build application (compile only)
-        run: mvn clean compile -DskipTests
+      - name: Build and test with Maven
+        run: mvn clean test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
 
-      - name: Start Spring Boot Backend
-        run: mvn spring-boot:run &
+      - name: Package application
+        run: mvn package -DskipTests
 
-      - name: Wait for backend to start
-        run: |
-          echo "Waiting for Spring Boot backend..."
-          sleep 30  # optionally, increase if backend takes longer
-
-      - name: Run All Tests (including Selenium UI)
-        run: xvfb-run -a mvn test
-
-      - name: Generate Test Report
-        run: |
-          mvn surefire-report:report site
-          echo "=== TEST RESULTS ==="
-          cat target/surefire-reports/*.txt | grep -E "(Tests run|Failures|Errors)" || echo "No test reports generated"
-
-      - name: Upload Test Reports
+      - name: Upload JAR file
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
-          path: |
-            target/surefire-reports/
-            target/site/
-          retention-days: 7
-
-      - name: Show Build Success
-        run: |
-          echo "🎉 CI/CD Pipeline Completed Successfully!"
-          echo "📊 Test reports are available in the artifacts"
-          echo "✅ All tests passed!"
+          name: taskmanager-app
+          path: target/*.jar
