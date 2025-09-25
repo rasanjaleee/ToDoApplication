@@ -4,6 +4,8 @@ import com.example.taskmanager.model.User;
 import com.example.taskmanager.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -16,6 +18,18 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@RequestBody SignupRequest signUpRequest) {
         try {
+
+            if (!signUpRequest.getEmail().contains("@") || !signUpRequest.getEmail().contains(".")) {
+                throw new IllegalArgumentException("Invalid email format!");
+            }
+
+
+            if (userService.existsByEmail(signUpRequest.getEmail())) {
+                return ResponseEntity
+                        .badRequest()
+                        .body("Email already exists, please log in.");
+            }
+
             User user = userService.registerUser(signUpRequest);
             AuthResponse response = new AuthResponse();
             response.setUserId(user.getId());
@@ -45,4 +59,6 @@ public class AuthController {
     public ResponseEntity<?> testConnection() {
         return ResponseEntity.ok("Backend is connected!");
     }
+
+
 }

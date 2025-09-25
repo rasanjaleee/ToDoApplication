@@ -24,9 +24,11 @@ public class LoginUITest {
         io.github.bonigarcia.wdm.WebDriverManager.chromedriver().setup();
 
         ChromeOptions options = new ChromeOptions();
+
+        // Detect if running in CI
         String ciEnv = System.getenv("CI");
         if ("true".equals(ciEnv)) {
-            options.addArguments("--headless");
+            options.addArguments("--headless=new"); // New headless mode
             options.addArguments("--no-sandbox");
             options.addArguments("--disable-dev-shm-usage");
             options.addArguments("--disable-gpu");
@@ -46,7 +48,7 @@ public class LoginUITest {
         driver.findElement(By.name("password")).sendKeys("password123");
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
-        // Use text-based check instead of ID
+        // Check welcome message
         WebElement welcome = wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("//*[contains(text(),'Welcome')]")
         ));
