@@ -1,10 +1,10 @@
-name: CI/CD Pipeline
+name: Java CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
   build-and-test:
@@ -14,103 +14,70 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: Rasa@123
-          MYSQL_DATABASE: taskmanager_test
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: taskmanager
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping --silent"
+          --health-cmd="mysqladmin ping"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=3
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
-          distribution: temurin
-          java-version: 17
-          cache: maven
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
 
-      - name: Install dependencies for Selenium
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libappindicator3-1 fonts-liberation
+      - name: Validate Maven configuration
+        run: mvn --version
 
-      - name: Install Google Chrome
-        run: |
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -f -y
-          google-chrome --version
+      - name: Build application (compile only)
+        run: mvn clean compile -DskipTests
 
-      - name: Install matching ChromeDriver
-        run: |
-          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
-          echo "Detected Chrome version: $CHROME_VERSION"
-          DRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION)
-          echo "Using ChromeDriver version: $DRIVER_VERSION"
-          wget https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip
-          unzip chromedriver_linux64.zip
-          sudo mv chromedriver /usr/local/bin/
-          sudo chmod +x /usr/local/bin/
-          chromedriver --version
-
-      - name: Build project
-        run: mvn clean package -DskipTests
-
-      - name: Start Spring Boot server
-        run: |
-          mvn spring-boot:run &
-          # Wait until backend is ready
-          for i in {1..12}; do
-            curl -s http://localhost:8080/actuator/health && break
-            echo "Waiting for Spring Boot..."
-            sleep 5
-          done
+      - name: Run Unit Tests
+        run: mvn test -DskipITs=true
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
           SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: Rasa@123
-          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
 
-      - name: Run Selenium & Unit Tests
+      - name: Run Integration Tests
+        run: mvn verify -DskipUnitTests=true -Dtest=*IT
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
+
+      - name: Run All Tests (Final verification)
         run: mvn test
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/taskmanager_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
           SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: Rasa@123
-          SPRING_PROFILES_ACTIVE: test
-          CI: true
+          SPRING_DATASOURCE_PASSWORD: Edirsinghe2002R
 
-      - name: Upload test reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: target/surefire-reports/
-
-      - name: Build JAR
-        run: mvn package -DskipTests
-
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-jar
-          path: target/*.jar
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Download JAR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: application-jar
-
-      - name: Deploy to server (Placeholder)
+      - name: Generate Test Report
         run: |
-          echo "Deployment step placeholder - add real deployment commands here"
+          mvn surefire-report:report site
+          echo "=== TEST RESULTS ==="
+          echo "Tests completed successfully!"
+
+      - name: Upload Test Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/site/
+          retention-days: 7
+
+      - name: Show Build Success
+        run: |
+          echo "🎉 CI/CD Pipeline Completed Successfully!"
+          echo "📊 Test reports are available in the artifacts"
