@@ -53,15 +53,6 @@ jobs:
       - name: Wait for backend to start
         run: sleep 20  # wait 20 seconds for Spring Boot to be ready
 
-      - name: Start Frontend (if applicable)
-        run: |
-          cd frontend
-          npm install
-          npm run build
-          npm run serve &
-
-      - name: Wait for frontend to start
-        run: sleep 10  # wait 10 seconds for frontend to be ready
 
       - name: Run All Tests (including Selenium UI)
         run: mvn test
