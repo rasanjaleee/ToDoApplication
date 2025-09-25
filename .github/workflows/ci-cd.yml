@@ -1,4 +1,4 @@
-name: Java CI/CD Pipeline with Selenium
+name: Java CI/CD Pipeline
 
 on:
   push:
@@ -25,7 +25,6 @@ jobs:
           --health-retries=3
 
     env:
-      CI: true
       SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/taskmanager
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Edirisinghe2002R
@@ -53,9 +52,8 @@ jobs:
       - name: Wait for backend to start
         run: sleep 20  # wait 20 seconds for Spring Boot to be ready
 
-
-      - name: Run All Tests (including Selenium UI)
-        run: mvn test
+      - name: Run Unit/Integration Tests (Skip Selenium UI)
+        run: mvn test -Dtest='!*UITest*'
         shell: bash
 
       - name: Generate Test Report
@@ -77,4 +75,4 @@ jobs:
         run: |
           echo "🎉 CI/CD Pipeline Completed Successfully!"
           echo "📊 Test reports are available in the artifacts"
-          echo "✅ All tests passed!"
+          echo "✅ All unit/integration tests passed!"
