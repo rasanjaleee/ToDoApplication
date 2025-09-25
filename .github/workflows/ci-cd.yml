@@ -55,6 +55,7 @@ jobs:
 
       - name: Start Frontend (if applicable)
         run: |
+          cd frontend
           npm install
           npm run build
           npm run serve &
