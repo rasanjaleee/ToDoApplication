@@ -20,18 +20,23 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/api/**").permitAll() // Allow all API endpoints
+                        // Allow API endpoints
+                        .requestMatchers("/api/**").permitAll()
+                        // Allow frontend React routes
+                        .requestMatchers("/", "/index.html", "/signup", "/login", "/static/**").permitAll()
                         .anyRequest().authenticated()
                 );
+
         return http.build();
     }
 
+    @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("*")); // Allow all origins in development
+        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:5173")); // React dev server
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

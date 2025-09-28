@@ -52,7 +52,7 @@ public class AuthApiTest {
                 .post("/api/auth/login")
                 .then()
                 .statusCode(400) // AuthController returns badRequest()
-                .body(equalTo("Invalid credentials")); // plain text response
+                .body("message", equalTo("Invalid email or password"));
     }
 
     @Test
@@ -83,6 +83,6 @@ public class AuthApiTest {
                 .post("/api/auth/signup")
                 .then()
                 .statusCode(400) // badRequest
-                .body(equalTo("Email is already in use!")); // plain text
+                .body("message", equalTo("Email is already in use!")); // plain text
     }
 }

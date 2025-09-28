@@ -25,7 +25,7 @@ public class LoginUITest {
 
         ChromeOptions options = new ChromeOptions();
 
-        // Detect if running in CI
+
         String ciEnv = System.getenv("CI");
         if ("true".equals(ciEnv)) {
             options.addArguments("--headless=new"); // New headless mode
@@ -48,7 +48,6 @@ public class LoginUITest {
         driver.findElement(By.name("password")).sendKeys("password123");
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
-        // Check welcome message
         WebElement welcome = wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("//*[contains(text(),'Welcome')]")
         ));

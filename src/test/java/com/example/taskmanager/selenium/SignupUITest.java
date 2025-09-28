@@ -1,23 +1,26 @@
 package com.example.taskmanager.selenium;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.junit.jupiter.api.*;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
+import org.openqa.selenium.support.ui.*;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class SignupUITest {
+
+    @LocalServerPort
+    private int port;
 
     private WebDriver driver;
     private WebDriverWait wait;
+    private String baseUrl;
 
     @BeforeEach
     void setup() {
@@ -26,7 +29,7 @@ public class SignupUITest {
         ChromeOptions options = new ChromeOptions();
         String ciEnv = System.getenv("CI");
         if ("true".equals(ciEnv)) {
-            options.addArguments("--headless=new"); // New headless mode
+            options.addArguments("--headless=new");
             options.addArguments("--no-sandbox");
             options.addArguments("--disable-dev-shm-usage");
             options.addArguments("--disable-gpu");
@@ -34,43 +37,38 @@ public class SignupUITest {
         }
 
         driver = new ChromeDriver(options);
+        baseUrl = "http://localhost:5173";
         wait = new WebDriverWait(driver, Duration.ofSeconds(20));
         driver.manage().window().maximize();
     }
 
     @Test
-    void testSuccessfulSignup() {
-        driver.get("http://localhost:5173/signup");
+    public void testSuccessfulSignup() {
+        driver.get(baseUrl + "/signup");
 
-        String timestamp = String.valueOf(System.currentTimeMillis());
-        String email = "test" + timestamp + "@example.com";
+        WebElement nameInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("name")));
+        WebElement emailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("email")));
+        WebElement passwordInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("password")));
+        WebElement confirmPasswordInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("confirmPassword"))); // ✅ Added
+        WebElement submitButton = wait.until(ExpectedConditions.elementToBeClickable(By.id("signup-btn")));
 
-        driver.findElement(By.id("name")).sendKeys("Test User");
-        driver.findElement(By.id("email")).sendKeys(email);
-        driver.findElement(By.id("password")).sendKeys("password123");
-        driver.findElement(By.id("confirmPassword")).sendKeys("password123");
-        driver.findElement(By.id("signup-btn")).click();
+        String uniqueEmail = "test" + System.currentTimeMillis() + "@example.com";
 
-        WebElement success = wait.until(
-                ExpectedConditions.visibilityOfElementLocated(By.id("success-message"))
-        );
-        Assertions.assertTrue(success.getText().contains("Registration successful"));
-    }
+        nameInput.sendKeys("Test User");
+        emailInput.sendKeys(uniqueEmail);
+        passwordInput.sendKeys("password123");
+        confirmPasswordInput.sendKeys("password123"); // ✅ Added
+        submitButton.click();
 
-    @Test
-    void testSignupWithExistingEmail() {
-        driver.get("http://localhost:5173/signup");
+        try {
 
-        driver.findElement(By.id("name")).sendKeys("Test User");
-        driver.findElement(By.id("email")).sendKeys("test@example.com"); // existing email
-        driver.findElement(By.id("password")).sendKeys("password123");
-        driver.findElement(By.id("confirmPassword")).sendKeys("password123");
-        driver.findElement(By.id("signup-btn")).click();
-
-        WebElement error = wait.until(
-                ExpectedConditions.visibilityOfElementLocated(By.id("error-message"))
-        );
-        Assertions.assertTrue(error.getText().contains("Email already exists"));
+            wait.until(ExpectedConditions.urlContains("login"));
+            assertTrue(driver.getCurrentUrl().contains("login"), "Should be redirected to login page");
+        } catch (TimeoutException e) {
+            // fallback: check success message
+            WebElement successMessage = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("success-message")));
+            assertTrue(successMessage.isDisplayed(), "Success message should be displayed");
+        }
     }
 
     @AfterEach

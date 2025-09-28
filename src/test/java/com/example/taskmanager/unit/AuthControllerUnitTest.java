@@ -49,11 +49,8 @@ public class AuthControllerUnitTest {
 
         String loginJson = objectMapper.writeValueAsString(loginRequest);
 
-        User user = new User();
+        User user = new User("Test User", "test@example.com", "encodedPassword");
         user.setId(1L);
-        user.setName("Test User");
-        user.setEmail("test@example.com");
-        user.setPassword("encodedPassword");
 
         when(userService.loginUser(any(LoginRequest.class))).thenReturn(user);
 
@@ -83,7 +80,7 @@ public class AuthControllerUnitTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginJson))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().string("Invalid password"));
+                .andExpect(jsonPath("$.message").value("Invalid password"));
 
         verify(userService, times(1)).loginUser(any(LoginRequest.class));
     }
@@ -97,11 +94,8 @@ public class AuthControllerUnitTest {
 
         String signupJson = objectMapper.writeValueAsString(signupRequest);
 
-        User newUser = new User();
+        User newUser = new User("New User", "new@example.com", "encodedPassword");
         newUser.setId(2L);
-        newUser.setName("New User");
-        newUser.setEmail("new@example.com");
-        newUser.setPassword("encodedPassword");
 
         when(userService.registerUser(any(SignupRequest.class))).thenReturn(newUser);
 
@@ -132,7 +126,7 @@ public class AuthControllerUnitTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signupJson))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().string("Email is already in use!"));
+                .andExpect(jsonPath("$.message").value("Email is already in use!"));
 
         verify(userService, times(1)).registerUser(any(SignupRequest.class));
     }
@@ -141,6 +135,6 @@ public class AuthControllerUnitTest {
     void testConnection() throws Exception {
         mockMvc.perform(get("/api/auth/test"))
                 .andExpect(status().isOk())
-                .andExpect(content().string("Backend is connected!"));
+                .andExpect(jsonPath("$.message").value("Backend is connected!"));
     }
 }
