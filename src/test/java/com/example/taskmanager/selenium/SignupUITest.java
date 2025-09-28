@@ -43,7 +43,7 @@ public class SignupUITest {
     }
 
     @Test
-    public void testSuccessfulSignup() {
+     void testSuccessfulSignup() {
         driver.get(baseUrl + "/signup");
 
         WebElement nameInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("name")));
