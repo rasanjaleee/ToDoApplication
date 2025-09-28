@@ -14,7 +14,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: Edirisinghe2002R
+          MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
           MYSQL_DATABASE: taskmanager
         ports:
           - 3306:3306
@@ -33,7 +33,7 @@ jobs:
       - name: Setup MySQL
         run: |
           sleep 20
-          mysql -h 127.0.0.1 -u root -pEdirisinghe2002R -e "CREATE DATABASE IF NOT EXISTS taskmanager;"
+          mysql -h 127.0.0.1 -u root -p${DB_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS taskmanager;"
           echo "✅ MySQL database setup completed"
 
       # 🔹 UNIT TESTS
